@@ -3,6 +3,12 @@ package edu.jsu.mcis.cs310;
 import com.github.cliftonlabs.json_simple.*;
 import com.opencsv.*;
 
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+
 public class Converter {
     
     /*
@@ -79,7 +85,43 @@ public class Converter {
         try {
         
             // INSERT YOUR CODE HERE
+            CSVReader reader = new CSVReader(new StringReader(csvString));
+            List<String[]> records = reader.readAll();  // from 10_DataExchange.pdf
+            reader.close();
             
+            if (records.isEmpty()) {
+                return result; //returns empty
+            }
+            
+            // time to start to extract the headers
+            String[] headers = records.get(0);
+            JsonArray prodNums = new JsonArray();
+            JsonArray dataArray = new JsonArray();
+            
+            // process data rows
+            for (int i = 1; i < records.size(); i++) {
+                String[] row = records.get(i);
+                prodNums.add(row[0]); // First column is ProdNum
+                
+                JsonArray rowData = new JsonArray();
+                for (int j = 1; j < row.length; j++) {
+                    if (j == 2 || j == 3) { // Convert Season and Episode to integers
+                        rowData.add(Integer.parseInt(row[j]));
+                    } else {
+                        rowData.add(row[j]);
+                    }
+                }
+                dataArray.add(rowData);
+            }
+            
+            // making the JSON object
+            JsonObject jsonOutput = new JsonObject();
+            jsonOutput.put("ProdNums", prodNums);
+            jsonOutput.put("ColHeadings", new JsonArray(Arrays.asList(headers)));
+            jsonOutput.put("Data", dataArray);
+
+            // convert JSON object to string
+            result = Jsoner.serialize(jsonOutput);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -97,7 +139,36 @@ public class Converter {
         try {
             
             // INSERT YOUR CODE HERE
-            
+            JsonObject jsonObject = Jsoner.deserialize(jsonString, new JsonObject());
+
+            JsonArray colHeaders = (JsonArray) jsonObject.get("ColHeadings");
+            JsonArray prodNums = (JsonArray) jsonObject.get("ProdNums");
+            JsonArray data = (JsonArray) jsonObject.get("Data");
+
+            StringWriter writer = new StringWriter();
+            CSVWriter csvWriter = new CSVWriter(writer, ',', '"', '\\', "\n");
+
+            // Write column headers
+            csvWriter.writeNext((String[]) colHeaders.toArray(new String[0]));
+
+            // time to write data rows
+            for (int i = 0; i < data.size(); i++) {
+                JsonArray row = (JsonArray) data.get(i);
+                List<String> rowValues = new ArrayList<>();
+                rowValues.add(prodNums.get(i).toString()); // add ProdNum before continuing 
+
+                for (Object value : row) {
+                    rowValues.add(value.toString()); // ... into String
+                }
+
+                csvWriter.writeNext(rowValues.toArray(new String[0]));
+            }
+
+            // get output
+            csvWriter.close();
+            result = writer.toString();
+
+
         }
         catch (Exception e) {
             e.printStackTrace();
